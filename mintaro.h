@@ -766,6 +766,7 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button);
 #ifdef MINTARO_IMPLEMENTATION
 #include <assert.h>
 #include <stdio.h>  // Required for printf() and family which is used in mo_logf().
+#include <stdarg.h> // va_list, va_start, va_arg, va_end
 
 // Standard library functions.
 #ifndef mo_zero_memory
@@ -1111,7 +1112,7 @@ void mo_x11_create_presentation_buffer(mo_context* pContext, unsigned int sizeX,
 		
 		pContext->pPresentBufferX11 = pImage;
 	} else {
-		char* pImageData = mo_malloc(sizeX * sizeY * 4);
+		char* pImageData = (char*)mo_malloc(sizeX * sizeY * 4);
 		if (pImageData == NULL) {
 			return;	// Out of memory.
 		}
@@ -1462,7 +1463,7 @@ mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowS
     int whiteColor = WhitePixel(g_moX11Display, DefaultScreen(g_moX11Display));
 	
 	pContext->windowX11 = XCreateSimpleWindow(g_moX11Display, DefaultRootWindow(g_moX11Display),
-		0, 0, pProfile->windowSizeX, pProfile->windowSizeY, 0, blackColor, blackColor);
+		0, 0, windowSizeX, windowSizeY, 0, blackColor, blackColor);
 	if (pContext->windowX11 == 0) {
 		mo_uninit(pContext);
 		return MO_FAILED_TO_INIT_PLATFORM;
