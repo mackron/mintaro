@@ -837,6 +837,9 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button);
 #ifdef STB_VORBIS_INCLUDE_STB_VORBIS_H
 #define MO_HAS_STB_VORBIS
 #endif
+#ifdef dr_flac_h
+#define MO_HAS_DR_FLAC
+#endif
 
 #ifdef MO_X11
 #include <stdlib.h>
@@ -3534,6 +3537,75 @@ free_and_return_null:
     #undef MO_WAV_GUID_EQUAL
 }
 
+#ifdef MO_HAS_STB_VORBIS
+static mo_int16* mo_sound_source_load__vorbis(const void* pFileData, size_t fileSize, unsigned int* pChannels, unsigned int* pSampleRate, mo_uint64* pSampleCount)
+{
+    if (pChannels != NULL) *pChannels = 0;
+    if (pSampleRate != NULL) *pSampleRate = 0;
+    if (pSampleCount != NULL) *pSampleCount = 0;
+
+    int channels;
+    int sampleRate;
+    short* pTempSamples;
+    int sampleCount = stb_vorbis_decode_memory((const unsigned char*)pFileData, (int)fileSize, &channels, &sampleRate, &pTempSamples);
+    if (sampleCount == -1) {
+        return NULL;
+    }
+
+    // The returned pointer is expected to be deallocated with mo_free(), however stb_vorbis uses standard malloc()/free() and has crappy
+    // support for customizing it. It's a bit lame, but we'll need to make a copy of the returned buffer which uses mo_malloc() for the
+    // allocation.
+    mo_int16* pSamples = (mo_int16*)mo_malloc(sampleCount * sizeof(mo_int16));
+    if (pSamples == NULL) {
+        free(pTempSamples);
+        return NULL;
+    }
+
+    mo_copy_memory(pSamples, pTempSamples, sampleCount * sizeof(mo_int16));
+    free(pTempSamples);
+
+    if (pChannels != NULL) *pChannels = (unsigned int)channels;
+    if (pSampleRate != NULL) *pSampleRate = (unsigned int)sampleRate;
+    if (pSampleCount != NULL) *pSampleCount = (mo_uint64)sampleCount;
+    return pSamples;
+}
+#endif
+
+#ifdef MO_HAS_DR_FLAC
+static mo_int16* mo_sound_source_load__flac(const void* pFileData, size_t fileSize, unsigned int* pChannels, unsigned int* pSampleRate, mo_uint64* pSampleCount)
+{
+    if (pChannels != NULL) *pChannels = 0;
+    if (pSampleRate != NULL) *pSampleRate = 0;
+    if (pSampleCount != NULL) *pSampleCount = 0;
+
+    unsigned int channels;
+    unsigned int sampleRate;
+    dr_uint64 sampleCount;
+    dr_int32* pTempSamples = drflac_open_and_decode_memory_s32(pFileData, fileSize, &channels, &sampleRate, &sampleCount);
+    if (pTempSamples == NULL) {
+        return NULL;
+    }
+
+    // As with stb_vorbis, dr_flac has crappy support for customizing malloc/free, etc. The same issues apply here as stb_vorbis above.
+    mo_int16* pSamples = (mo_int16*)mo_malloc((size_t)sampleCount * sizeof(mo_int16));
+    if (pSamples == NULL) {
+        free(pTempSamples);
+        return NULL;
+    }
+
+    for (mo_uint64 iSample = 0; iSample < sampleCount; ++iSample) {
+        pSamples[iSample] = (dr_int16)(pTempSamples[iSample] >> 16);
+    }
+
+    drflac_free(pTempSamples);
+
+    if (pChannels != NULL) *pChannels = (unsigned int)channels;
+    if (pSampleRate != NULL) *pSampleRate = (unsigned int)sampleRate;
+    if (pSampleCount != NULL) *pSampleCount = (mo_uint64)sampleCount;
+    return pSamples;
+}
+#endif
+
 mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_sound_source** ppSource)
 {
     if (ppSource == NULL) return MO_INVALID_ARGS;
@@ -3550,13 +3622,25 @@ mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_so
     unsigned int channels;
     unsigned int sampleRate;
     uint64_t totalSampleCount;
-    mo_int16* pSampleDataS16 = mo_sound_source_load__wav(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    mo_int16* pSampleDataS16 = NULL;
+    
+    // WAV.
+    pSampleDataS16 = mo_sound_source_load__wav(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+#ifdef MO_HAS_STB_VORBIS
     if (pSampleDataS16 == NULL) {
-        mo_free(pFileData);
-        return MO_INVALID_RESOURCE;
+        pSampleDataS16 = mo_sound_source_load__vorbis(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
     }
+#endif
+#ifdef MO_HAS_DR_FLAC
+    if (pSampleDataS16 == NULL) {
+        pSampleDataS16 = mo_sound_source_load__flac(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    }
+#endif
 
     mo_free(pFileData);
+    if (pSampleDataS16 == NULL) {
+        return MO_INVALID_RESOURCE;
+    }
 
     if (totalSampleCount > SIZE_MAX) {
         return MO_INVALID_RESOURCE; // The file's too big.
@@ -3572,7 +3656,7 @@ mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_so
 void mo_sound_source_delete(mo_sound_source* pSource)
 {
     if (pSource == NULL) return;
-    free(pSource);
+    mo_free(pSource);
 }
 
 mo_result mo_play_sound_source(mo_context* pContext, mo_sound_source* pSource, mo_uint32 group)
@@ -4531,6 +4615,7 @@ static mal_result mal_device__start_backend__null(mal_device* pDevice)
 static mal_result mal_device__stop_backend__null(mal_device* pDevice)
 {
     mal_assert(pDevice != NULL);
+    (void)pDevice;
 
     return MAL_SUCCESS;
 }
