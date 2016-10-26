@@ -1609,11 +1609,9 @@ void mo_present(mo_context* pContext)
 			unsigned int screenX = x;
 			unsigned int screenY = y;
             pDstRow[x] = pContext->profile.palette[pContext->screen[screenY*pContext->profile.resolutionX + screenX]].rgba;
-            //pDstRow[x] = pContext->palette[pContext->screen[screenHeight - screenY - 1][screenX]].rgba;    // <-- Needs to be upside down for Win32. Can also use a negative scale in StretchDIBits()
 		}
 	}
 
-    //BitBlt(pContext->hDC, 0, 0, pContext->windowWidth, pContext->windowHeight, pContext->hDIBDC, 0, 0, SRCCOPY);
     StretchBlt(pContext->hDC, 0, 0, pContext->windowWidth, pContext->windowHeight, pContext->hDIBDC, 0, 0, pContext->profile.resolutionX, pContext->profile.resolutionY, SRCCOPY);
 #endif
 #endif
