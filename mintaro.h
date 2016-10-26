@@ -1207,7 +1207,7 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
             // Mono
             for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
                 float scaledSample0 = pSound->pSource->pSampleData[pSound->currentSample + iFrame] * linearVolume;
-                float outputSample0 = pFrames[iFrame] + scaledSample0;
+                float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
                 pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
                 pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
             }
@@ -1225,18 +1225,15 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
             pSound->currentSample += framesAvailable * soundChannels;
         } else {
             // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
-            //
-            // NOTE: This branch is untested.
             for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
                 for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
                     float scaledSample0 = pSound->pSource->pSampleData[pSound->currentSample + iFrame*soundChannels + iChannel] * linearVolume;
                     float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
                     pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames += 1;
                 }
-
-                pSound->currentSample += soundChannels;
             }
+
+            pSound->currentSample += framesAvailable * soundChannels;
         }
 
 
