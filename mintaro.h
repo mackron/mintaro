@@ -1,5 +1,5 @@
 // Small retro game framework. Public domain. See "unlicense" statement at the end of this file.
-// mintaro - v0.1 - Release Date TBD
+// mintaro - v0.1 - 2016-10-27
 //
 // David Reid - mackron@gmail.com
 
@@ -7385,7 +7385,7 @@ mal_uint32 mal_get_sample_size_in_bytes(mal_format format)
 // REVISION HISTORY
 // ================
 //
-// v0.1 - TBD
+// v0.1 - 2016-10-27
 //   - Initial versioned release.
 
 
