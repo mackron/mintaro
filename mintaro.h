@@ -498,11 +498,13 @@ typedef struct
 
 typedef struct
 {
-    mo_uint32 resolutionX;   // The width of the virtual screen.
-    mo_uint32 resolutionY;   // The height of the virtual screen.
-    mo_color_index transparentColorIndex;   // The index of the color in the palette representing transparency.
-	mo_uint32 paletteSize;   // The number of available colors. Maximum of 256.
+    mo_uint32 resolutionX;      // The width of the virtual screen.
+    mo_uint32 resolutionY;      // The height of the virtual screen.
+	mo_color_index transparentColorIndex;   // The index of the color in the palette representing transparency.
+    mo_uint32 paletteSize;      // The number of available colors. Maximum of 256.
     mo_color_rgba palette[256]; // Palette colors.
+    mo_uint32 audioChannels;    // The number of channels to use for audio. TODO: Implement me. Requires changes to mixing.
+    mo_uint32 audioSampleRate;  // The sample rate to use for audio.
 } mo_profile;
 
 typedef struct
@@ -1479,8 +1481,8 @@ mo_result mo_init_audio(mo_context* pContext)
     
     mal_device_config config;
     config.format = mal_format_s16;
-    config.channels = 2;
-    config.sampleRate = 44100;
+    config.channels = pContext->profile.audioChannels;
+    config.sampleRate = pContext->profile.audioSampleRate;
     config.bufferSizeInFrames = 0;
     config.periods = 0;
     config.onSendCallback = mo_on_send_frames__mal;
@@ -1530,12 +1532,25 @@ mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowS
     mo_profile defaultProfile;
     defaultProfile.resolutionX = 160;
     defaultProfile.resolutionY = 144;
-	defaultProfile.transparentColorIndex = 255;
+    defaultProfile.transparentColorIndex = 255;
     defaultProfile.paletteSize = 256;
     mo_copy_memory(defaultProfile.palette, g_moDefaultPalette, 256*4);
+    defaultProfile.audioChannels = 2;
+    defaultProfile.audioSampleRate = 44100;
     if (pProfile == NULL) pProfile = &defaultProfile;
     if (pProfile->paletteSize == 0) return MO_BAD_PROFILE;
     if (pProfile->transparentColorIndex >= pProfile->paletteSize) return MO_BAD_PROFILE;
+
+    if (pProfile->audioSampleRate == 0) pProfile->audioSampleRate = 44100;
+    if (pProfile->audioChannels == 0) pProfile->audioChannels = 2;
+
+    // For now, only supporting a channel count of 2.
+    if (pProfile->audioChannels < 2) {
+        pProfile->audioChannels = 2;    // Remove this entire if statement when support for mono is added.
+    }
+    if (pProfile->audioChannels > 2) {
+        pProfile->audioChannels = 2;
+    }
 
     if (windowSizeX == 0) windowSizeX = pProfile->resolutionX;
     if (windowSizeY == 0) windowSizeY = pProfile->resolutionY;
@@ -2840,7 +2855,7 @@ mo_color_index mo_find_closest_color(mo_context* pContext, mo_color_rgba color)
 {
 	if (pContext == NULL) return 0;
 	
-	// We just do a simple distance test. There's no need for anything advanced here, but we do use YUV for the distance.
+	// We just do a simple distance test.
     float minDistance = 3.402823e+38f;  // FLT_MAX
     mo_color_index closestIndex = 0;
 
