@@ -68,6 +68,17 @@ extern "C" {
 #include <X11/extensions/XShm.h>
 #endif
 
+// External library support.
+#ifdef STBI_INCLUDE_STB_IMAGE_H
+#define MO_HAS_STB_IMAGE
+#endif
+#ifdef STB_VORBIS_INCLUDE_STB_VORBIS_H
+#define MO_HAS_STB_VORBIS
+#endif
+#ifdef dr_flac_h
+#define MO_HAS_DR_FLAC
+#endif
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 // BEGIN MINI_AL HEADER SECTTION
@@ -360,8 +371,9 @@ typedef int mo_result;
 #define MO_DOES_NOT_EXIST			-5
 #define MO_INVALID_RESOURCE			-6
 #define MO_UNSUPPORTED_IMAGE_FORMAT	-7
-#define MO_FAILED_TO_INIT_AUDIO     -8
-#define MO_BAD_PROFILE              -9
+#define MO_UNSUPPORTED_AUDIO_FORMAT -8
+#define MO_FAILED_TO_INIT_AUDIO     -9
+#define MO_BAD_PROFILE              -10
 
 typedef unsigned int mo_event_type;
 #define MO_EVENT_TYPE_KEY_DOWN		1
@@ -450,6 +462,13 @@ typedef enum
 	mo_image_format_rgba8
 } mo_image_format;
 
+typedef enum
+{
+    mo_sound_source_type_raw,
+    mo_sound_source_type_vorbis,
+    mo_sound_source_type_flac
+} mo_sound_source_type;
+
 #ifdef _MSC_VER
     #pragma warning(push)
     #pragma warning(disable:4201)
@@ -496,10 +515,29 @@ typedef struct
 
 struct mo_sound_source
 {
-    mo_uint32 channels;
-    mo_uint32 sampleRate;
-    mo_uint64 sampleCount;
-    mo_int16 pSampleData[1];
+    mo_sound_source_type type;
+    union
+    {
+        struct
+        {
+            mo_uint32 channels;
+            mo_uint32 sampleRate;
+            mo_uint64 sampleCount;
+            mo_int16 pSampleData[1];
+        } raw;
+
+        struct
+        {
+            size_t dataSize;
+            mo_uint8 pData[1];
+        } vorbis;
+
+        struct
+        {
+            size_t dataSize;
+            mo_uint8 pData[1];
+        } flac;
+    };
 };
 
 struct mo_sound
@@ -510,8 +548,28 @@ struct mo_sound
     float linearVolume;
     float pan;
     mo_uint32 flags;
-    mo_uint64 currentSample;
     mo_bool32 isMarkedForDeletion;
+
+    // Streaming.
+    union
+    {
+        struct
+        {
+            mo_uint64 currentSample;
+        } raw;
+
+        struct
+        {
+            mo_uint64 currentSample;
+            /*stb_vorbis**/ void* pDecoder;
+        } vorbis;
+
+        struct
+        {
+            mo_uint64 currentSample;
+            /*drflac**/ void* pDecoder;
+        } flac;
+    };
 };
 
 struct mo_sound_group
@@ -673,6 +731,8 @@ void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth
 
 // Creates a sound source. When a sound is played, you pass in a reference to this source.
 mo_result mo_sound_source_create(mo_context* pContext, unsigned int channels, unsigned int sampleRate, mo_uint64 sampleCount, const mo_int16* pSampleData, mo_sound_source** ppSource);
+mo_result mo_sound_source_create_vorbis(mo_context* pContext, size_t dataSize, const void* pData, mo_sound_source** ppSource);
+mo_result mo_sound_source_create_flac(mo_context* pContext, size_t dataSize, const void* pData, mo_sound_source** ppSource);
 
 // Loads a sound source from a file.
 mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_sound_source** ppSource);
@@ -826,19 +886,6 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button);
 #else
 #define mo_assert(condition) assert(condition)
 #endif
-#endif
-
-
-
-// External library support.
-#ifdef STBI_INCLUDE_STB_IMAGE_H
-#define MO_HAS_STB_IMAGE
-#endif
-#ifdef STB_VORBIS_INCLUDE_STB_VORBIS_H
-#define MO_HAS_STB_VORBIS
-#endif
-#ifdef dr_flac_h
-#define MO_HAS_DR_FLAC
 #endif
 
 #ifdef MO_X11
@@ -1193,68 +1240,201 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
     // into making this more robust.
     mo_assert(pSound->pContext->playbackDevice2.channels == 2);
 
-    const mo_uint32 soundChannels = pSound->pSource->channels;
-    const mo_uint32 deviceChannels = pSound->pContext->playbackDevice2.channels;
-
     mo_uint32 totalFramesRead = 0;
-    while (frameCount > 0) {
-        mo_uint64 framesAvailable = (pSound->pSource->sampleCount - pSound->currentSample) / pSound->pSource->channels;
-        if (framesAvailable > frameCount) {
-            framesAvailable = frameCount;
-        }
 
-        if (soundChannels == 1) {
-            // Mono
-            for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                float scaledSample0 = pSound->pSource->pSampleData[pSound->currentSample + iFrame] * linearVolume;
-                float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+    mo_sound_source* pSource = pSound->pSource;
+    mo_assert(pSource != NULL);
+
+    if (pSource->type == mo_sound_source_type_raw)
+    {
+        const mo_uint32 soundChannels = pSound->pSource->raw.channels;
+        const mo_uint32 deviceChannels = pSound->pContext->playbackDevice2.channels;
+        while (frameCount > 0) {
+            mo_uint64 framesAvailable = (pSound->pSource->raw.sampleCount - pSound->raw.currentSample) / pSound->pSource->raw.channels;
+            if (framesAvailable > frameCount) {
+                framesAvailable = frameCount;
             }
-            pSound->currentSample += framesAvailable * soundChannels;
-        } else if (soundChannels == 2) {
-            // Stereo
-            for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                float scaledSample0 = pSound->pSource->pSampleData[pSound->currentSample + iFrame*soundChannels + 0] * linearVolume;
-                float scaledSample1 = pSound->pSource->pSampleData[pSound->currentSample + iFrame*soundChannels + 1] * linearVolume;
-                float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
-                pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
-            }
-            pSound->currentSample += framesAvailable * soundChannels;
-        } else {
-            // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
-            for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
-                    float scaledSample0 = pSound->pSource->pSampleData[pSound->currentSample + iFrame*soundChannels + iChannel] * linearVolume;
-                    float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
-                    pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+
+            if (soundChannels == 1) {
+                // Mono
+                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                    float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame] * linearVolume;
+                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
                 }
-            }
-
-            pSound->currentSample += framesAvailable * soundChannels;
-        }
-
-
-        mo_bool32 reachedEnd = framesAvailable < frameCount;
-        frameCount -= (mo_uint32)framesAvailable;   // <-- Safe cast because we clamped it to frameCount which is 32-bit.
-        pFrames += framesAvailable * deviceChannels;
-
-        if (reachedEnd) {
-            if (mo_sound_is_looping(pSound)) {
-                pSound->currentSample = 0;
+                pSound->raw.currentSample += framesAvailable * soundChannels;
+            } else if (soundChannels == 2) {
+                // Stereo
+                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                    float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 0] * linearVolume;
+                    float scaledSample1 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 1] * linearVolume;
+                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
+                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                }
+                pSound->raw.currentSample += framesAvailable * soundChannels;
             } else {
-                if ((pSound->flags & MO_SOUND_FLAG_INLINED) != 0) {
-                    mo_sound_mark_for_deletion(pSound);
-                } else {
-                    mo_sound_stop(pSound);
+                // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
+                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                    for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
+                        float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + iChannel] * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
+                        pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    }
                 }
+                pSound->raw.currentSample += framesAvailable * soundChannels;
+            }
 
-                break;
+
+            mo_bool32 reachedEnd = framesAvailable < frameCount;
+            frameCount -= (mo_uint32)framesAvailable;   // <-- Safe cast because we clamped it to frameCount which is 32-bit.
+            pFrames += framesAvailable * deviceChannels;
+
+            if (reachedEnd) {
+                if (mo_sound_is_looping(pSound)) {
+                    pSound->raw.currentSample = 0;
+                } else {
+                    if ((pSound->flags & MO_SOUND_FLAG_INLINED) != 0) {
+                        mo_sound_mark_for_deletion(pSound);
+                    } else {
+                        mo_sound_stop(pSound);
+                    }
+
+                    break;
+                }
             }
         }
     }
+#ifdef MO_HAS_STB_VORBIS
+    else if (pSource->type == mo_sound_source_type_vorbis)
+    {
+        // Conveniently, stb_vorbis supports sample retrieval with a custom channel count.
+        const mo_uint32 deviceChannels = pSound->pContext->playbackDevice2.channels;
+        const mo_uint32 soundChannels = deviceChannels;
+        while (frameCount > 0) {
+            mo_uint64 framesAvailable = frameCount;
+
+            // We need to use an intermediary here. The process goes: stb_vorbis -> temp buffer -> sum with output.
+            mo_int16 tempFrames[4096];
+            mo_uint32 tempFrameCount = sizeof(tempFrames) / sizeof(tempFrames[0]) / soundChannels;
+            if (framesAvailable > tempFrameCount) {
+                framesAvailable = tempFrameCount;
+            }
+
+            // This is used for later checking if we need to stop playback or loop back to the start.
+            mo_bool32 reachedEnd = MO_FALSE;
+            
+            int framesRead = stb_vorbis_get_samples_short_interleaved((stb_vorbis*)pSound->vorbis.pDecoder, (int)soundChannels, tempFrames, (int)(framesAvailable * soundChannels));
+            if (framesRead < (int)framesAvailable) {
+                reachedEnd = MO_TRUE;
+            }
+
+            // Unroll this loop for stereo? Probably not worth it...
+            for (mo_uint32 iSample = 0; iSample < framesRead*soundChannels; ++iSample) {
+                float scaledSample0 = tempFrames[iSample] * linearVolume;
+                float outputSample0 = pFrames[iSample] + scaledSample0;
+                pFrames[iSample] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+            }
+
+            pSound->vorbis.currentSample += framesRead * soundChannels;
+            frameCount -= (mo_uint32)framesAvailable;   // <-- Safe cast because we clamped it to frameCount which is 32-bit.
+            pFrames += framesAvailable * deviceChannels;
+
+            if (reachedEnd) {
+                if (mo_sound_is_looping(pSound)) {
+                    pSound->vorbis.currentSample = 0;
+                    stb_vorbis_seek_start((stb_vorbis*)pSound->vorbis.pDecoder);
+                } else {
+                    if ((pSound->flags & MO_SOUND_FLAG_INLINED) != 0) {
+                        mo_sound_mark_for_deletion(pSound);
+                    } else {
+                        mo_sound_stop(pSound);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+#endif
+#ifdef MO_HAS_DR_FLAC
+    else if (pSource->type == mo_sound_source_type_flac)
+    {
+        const mo_uint32 deviceChannels = pSound->pContext->playbackDevice2.channels;
+        const mo_uint32 soundChannels = ((drflac*)pSound->flac.pDecoder)->channels;
+        while (frameCount > 0) {
+            mo_uint64 framesAvailable = frameCount;
+
+            // We need to use an intermediary here. The process goes: dr_flac -> temp buffer -> sum with output.
+            mo_int32 tempFrames[4096];
+            mo_uint32 tempFrameCount = sizeof(tempFrames) / sizeof(tempFrames[0]) / soundChannels;
+            if (framesAvailable > tempFrameCount) {
+                framesAvailable = tempFrameCount;
+            }
+
+            // This is used for later checking if we need to stop playback or loop back to the start.
+            mo_bool32 reachedEnd = MO_FALSE;
+
+            dr_uint64 framesRead = drflac_read_s32((drflac*)pSound->flac.pDecoder, framesAvailable * soundChannels, tempFrames) / soundChannels;
+            if (framesRead < framesAvailable) {
+                reachedEnd = MO_TRUE;
+            }
+
+
+            // Channel conversion.
+            if (soundChannels == 1) {
+                // Mono
+                for (mo_uint32 iFrame = 0; iFrame < framesRead; ++iFrame) {
+                    float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
+                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                }
+            } else if (soundChannels == 2) {
+                // Stereo
+                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                    float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
+                    float scaledSample1 = (tempFrames[iFrame*soundChannels + 1] >> 16) * linearVolume;
+                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
+                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                }
+            } else {
+                // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
+                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                    for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
+                        float scaledSample0 = (tempFrames[iFrame*soundChannels + iChannel] >> 16) * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
+                        pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    }
+                }
+            }
+
+
+            pSound->flac.currentSample += framesRead * soundChannels;
+            frameCount -= (mo_uint32)framesAvailable;   // <-- Safe cast because we clamped it to frameCount which is 32-bit.
+            pFrames += framesAvailable * deviceChannels;
+
+            if (reachedEnd) {
+                if (mo_sound_is_looping(pSound)) {
+                    pSound->flac.currentSample = 0;
+                    drflac_seek_to_sample((drflac*)pSound->flac.pDecoder, 0);
+                } else {
+                    if ((pSound->flags & MO_SOUND_FLAG_INLINED) != 0) {
+                        mo_sound_mark_for_deletion(pSound);
+                    } else {
+                        mo_sound_stop(pSound);
+                    }
+
+                    break;
+                }
+            }
+        }
+    }
+#endif
 
     return totalFramesRead;
 }
@@ -3091,8 +3271,8 @@ void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth
     mo_assert(srcY+srcHeight <= (int)pImage->height);
 #endif
 
+#if 0
     // Make sure inputs are clamped.
-#if 1
     if (srcX < 0) {
         srcWidth += srcX;
         srcX = 0;
@@ -3177,6 +3357,44 @@ void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth
 
 //// Audio ////
 
+mo_result mo_sound_source_create__generic_decoder(mo_context* pContext, mo_sound_source_type type, size_t dataSize, const void* pData, mo_sound_source** ppSource)
+{
+    if (ppSource == NULL) return MO_INVALID_ARGS;
+	mo_zero_object(ppSource);
+
+	if (pContext == NULL || dataSize == 0 || pData == NULL) return MO_INVALID_ARGS;
+
+    mo_sound_source* pSource = (mo_sound_source*)mo_calloc(sizeof(*pSource) + dataSize);
+    if (pSource == NULL) {
+        return MO_OUT_OF_MEMORY;
+    }
+
+    pSource->type = type;
+    pSource->vorbis.dataSize = dataSize;
+    mo_copy_memory(pSource->vorbis.pData, pData, dataSize);
+
+    *ppSource = pSource;
+    return MO_SUCCESS;
+}
+
+mo_result mo_sound_source_create_vorbis(mo_context* pContext, size_t dataSize, const void* pData, mo_sound_source** ppSource)
+{
+#ifdef MO_HAS_STB_VORBIS
+    return mo_sound_source_create__generic_decoder(pContext, mo_sound_source_type_vorbis, dataSize, pData, ppSource);
+#else
+    return MO_UNSUPPORTED_AUDIO_FORMAT;
+#endif
+}
+
+mo_result mo_sound_source_create_flac(mo_context* pContext, size_t dataSize, const void* pData, mo_sound_source** ppSource)
+{
+#ifdef MO_HAS_STB_VORBIS
+    return mo_sound_source_create__generic_decoder(pContext, mo_sound_source_type_flac, dataSize, pData, ppSource);
+#else
+    return MO_UNSUPPORTED_AUDIO_FORMAT;
+#endif
+}
+
 mo_result mo_sound_source_create(mo_context* pContext, unsigned int channels, unsigned int sampleRate, mo_uint64 sampleCount, const mo_int16* pSampleData, mo_sound_source** ppSource)
 {
     if (ppSource == NULL) return MO_INVALID_ARGS;
@@ -3192,10 +3410,11 @@ mo_result mo_sound_source_create(mo_context* pContext, unsigned int channels, un
         return MO_OUT_OF_MEMORY;
     }
 
-    pSource->channels = channels;
-    pSource->sampleRate = sampleRate;
-    pSource->sampleCount = sampleCount;
-    mo_copy_memory(pSource->pSampleData, pSampleData, sampleDataSize);
+    pSource->type = mo_sound_source_type_raw;
+    pSource->raw.channels = channels;
+    pSource->raw.sampleRate = sampleRate;
+    pSource->raw.sampleCount = sampleCount;
+    mo_copy_memory(pSource->raw.pSampleData, pSampleData, sampleDataSize);
 
     *ppSource = pSource;
 	return MO_SUCCESS;
@@ -3533,71 +3752,26 @@ free_and_return_null:
 }
 
 #ifdef MO_HAS_STB_VORBIS
-static mo_int16* mo_sound_source_load__vorbis(const void* pFileData, size_t fileSize, unsigned int* pChannels, unsigned int* pSampleRate, mo_uint64* pSampleCount)
+static mo_bool32 mo_is_vorbis_stream(size_t dataSize, const void* pData)
 {
-    if (pChannels != NULL) *pChannels = 0;
-    if (pSampleRate != NULL) *pSampleRate = 0;
-    if (pSampleCount != NULL) *pSampleCount = 0;
+    // This is a simple check to see if the given data is a valid Vorbis stream.
+    stb_vorbis* pDecoder = stb_vorbis_open_memory((const unsigned char*)pData, (int)dataSize, NULL, NULL);
+    mo_bool32 isVorbis = pDecoder != NULL;
 
-    int channels;
-    int sampleRate;
-    short* pTempSamples;
-    int sampleCount = stb_vorbis_decode_memory((const unsigned char*)pFileData, (int)fileSize, &channels, &sampleRate, &pTempSamples);
-    if (sampleCount == -1) {
-        return NULL;
-    }
-
-    // The returned pointer is expected to be deallocated with mo_free(), however stb_vorbis uses standard malloc()/free() and has crappy
-    // support for customizing it. It's a bit lame, but we'll need to make a copy of the returned buffer which uses mo_malloc() for the
-    // allocation.
-    mo_int16* pSamples = (mo_int16*)mo_malloc(sampleCount * sizeof(mo_int16));
-    if (pSamples == NULL) {
-        free(pTempSamples);
-        return NULL;
-    }
-
-    mo_copy_memory(pSamples, pTempSamples, sampleCount * sizeof(mo_int16));
-    free(pTempSamples);
-
-    if (pChannels != NULL) *pChannels = (unsigned int)channels;
-    if (pSampleRate != NULL) *pSampleRate = (unsigned int)sampleRate;
-    if (pSampleCount != NULL) *pSampleCount = (mo_uint64)sampleCount;
-    return pSamples;
+    stb_vorbis_close(pDecoder);
+    return isVorbis;
 }
 #endif
 
 #ifdef MO_HAS_DR_FLAC
-static mo_int16* mo_sound_source_load__flac(const void* pFileData, size_t fileSize, unsigned int* pChannels, unsigned int* pSampleRate, mo_uint64* pSampleCount)
+static mo_bool32 mo_is_flac_stream(size_t dataSize, const void* pData)
 {
-    if (pChannels != NULL) *pChannels = 0;
-    if (pSampleRate != NULL) *pSampleRate = 0;
-    if (pSampleCount != NULL) *pSampleCount = 0;
+    // This is a simple check to see if the given data is a valid Vorbis stream.
+    drflac* pDecoder = drflac_open_memory(pData, dataSize);
+    mo_bool32 isFlac = pDecoder != NULL;
 
-    unsigned int channels;
-    unsigned int sampleRate;
-    dr_uint64 sampleCount;
-    dr_int32* pTempSamples = drflac_open_and_decode_memory_s32(pFileData, fileSize, &channels, &sampleRate, &sampleCount);
-    if (pTempSamples == NULL) {
-        return NULL;
-    }
-
-    // As with stb_vorbis, dr_flac has crappy support for customizing malloc/free, etc. The same issues apply here as stb_vorbis above.
-    mo_int16* pSamples = (mo_int16*)mo_malloc((size_t)sampleCount * sizeof(mo_int16));
-    if (pSamples == NULL) {
-        free(pTempSamples);
-        return NULL;
-    }
-
-    for (mo_uint64 iSample = 0; iSample < sampleCount; ++iSample) {
-        pSamples[iSample] = (dr_int16)(pTempSamples[iSample] >> 16);
-    }
-
-    drflac_free(pTempSamples);
-
-    if (pChannels != NULL) *pChannels = (unsigned int)channels;
-    if (pSampleRate != NULL) *pSampleRate = (unsigned int)sampleRate;
-    if (pSampleCount != NULL) *pSampleCount = (mo_uint64)sampleCount;
-    return pSamples;
+    drflac_close(pDecoder);
+    return isFlac;
 }
 #endif
 
@@ -3614,26 +3788,37 @@ mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_so
         return MO_DOES_NOT_EXIST;
     }
 
+    mo_result result = MO_INVALID_RESOURCE;
+    mo_sound_source* pSource = NULL;
+
+    // WAV / Raw.
     unsigned int channels;
     unsigned int sampleRate;
     uint64_t totalSampleCount;
-    mo_int16* pSampleDataS16 = NULL;
-    
-    // WAV.
-    pSampleDataS16 = mo_sound_source_load__wav(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    mo_int16* pSampleDataS16 = mo_sound_source_load__wav(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    if (pSampleDataS16 != NULL) {
+        result = mo_sound_source_create(pContext, channels, sampleRate, totalSampleCount, pSampleDataS16, &pSource);
+        mo_free(pSampleDataS16);
+    }
+
 #ifdef MO_HAS_STB_VORBIS
-    if (pSampleDataS16 == NULL) {
-        pSampleDataS16 = mo_sound_source_load__vorbis(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    if (pSource == NULL) {
+        if (mo_is_vorbis_stream(fileSize, pFileData)) {
+            result = mo_sound_source_create_vorbis(pContext, fileSize, pFileData, &pSource);
+        }
     }
 #endif
 #ifdef MO_HAS_DR_FLAC
-    if (pSampleDataS16 == NULL) {
-        pSampleDataS16 = mo_sound_source_load__flac(pFileData, fileSize, &channels, &sampleRate, &totalSampleCount);
+    if (pSource == NULL) {
+        if (mo_is_flac_stream(fileSize, pFileData)) {
+            result = mo_sound_source_create_flac(pContext, fileSize, pFileData, &pSource);
+        }
     }
 #endif
 
     mo_free(pFileData);
-    if (pSampleDataS16 == NULL) {
+
+    if (pSource == NULL) {
         return MO_INVALID_RESOURCE;
     }
 
@@ -3641,10 +3826,7 @@ mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_so
         return MO_INVALID_RESOURCE; // The file's too big.
     }
 
-
-    mo_result result = mo_sound_source_create(pContext, channels, sampleRate, totalSampleCount, pSampleDataS16, ppSource);
-    mo_free(pSampleDataS16);
-
+    *ppSource = pSource;
     return result;
 }
 
@@ -3714,6 +3896,34 @@ mo_result mo_sound_create(mo_context* pContext, mo_sound_source* pSource, mo_uin
     pSound->group = group;
     pSound->linearVolume = 1;
     pSound->pan = 0;
+
+    // Depending on the sound source we may need some per-sound decoding information.
+    if (pSource->type == mo_sound_source_type_raw)
+    {
+        pSound->raw.currentSample = 0;
+    }
+#ifdef MO_HAS_STB_VORBIS
+    else if (pSource->type == mo_sound_source_type_vorbis)
+    {
+        pSound->vorbis.currentSample = 0;
+        pSound->vorbis.pDecoder = stb_vorbis_open_memory((const unsigned char*)pSource->vorbis.pData, (int)pSource->vorbis.dataSize, NULL, NULL);
+        if (pSound->vorbis.pDecoder == NULL) {
+            mo_free(pSound);
+            return MO_INVALID_RESOURCE;
+        }
+    }
+#endif
+#ifdef MO_HAS_DR_FLAC
+    else if (pSource->type == mo_sound_source_type_flac)
+    {
+        pSound->flac.currentSample = 0;
+        pSound->flac.pDecoder = drflac_open_memory(pSource->flac.pData, pSource->flac.dataSize);
+        if (pSound->flac.pDecoder == NULL) {
+            mo_free(pSound);
+            return MO_INVALID_RESOURCE;
+        }
+    }
+#endif
 
     // Add the sound to the array.
     if (pContext->soundBufferSize == pContext->soundCount) {
