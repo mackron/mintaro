@@ -1250,7 +1250,7 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
         const mo_uint32 soundChannels = pSound->pSource->raw.channels;
         const mo_uint32 deviceChannels = pSound->pContext->playbackDevice2.channels;
         while (frameCount > 0) {
-            mo_uint64 framesAvailable = (pSound->pSource->raw.sampleCount - pSound->raw.currentSample) / pSound->pSource->raw.channels;
+            mo_uint64 framesAvailable = (pSound->pSource->raw.sampleCount - pSound->raw.currentSample) / soundChannels;
             if (framesAvailable > frameCount) {
                 framesAvailable = frameCount;
             }
@@ -1260,8 +1260,9 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
                 for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
                     float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame] * linearVolume;
                     float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
                     pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
                 }
                 pSound->raw.currentSample += framesAvailable * soundChannels;
             } else if (soundChannels == 2) {
@@ -1389,8 +1390,9 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
                 for (mo_uint32 iFrame = 0; iFrame < framesRead; ++iFrame) {
                     float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
                     float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
                     pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
                 }
             } else if (soundChannels == 2) {
                 // Stereo
