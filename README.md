@@ -1,41 +1,56 @@
-Mintaro is a tiny framework for making tiny, retro style games.
+![Mintaro](http://dred.io/img/mintaro_wide.png)
+
+Mintaro is a tiny framework for making simple, retro style games. It's not intended to be
+a full-featured game engine, but is instead focused on simplicity and just making it fun
+to make simple games.
+
+C/C++, single file, public domain.
+
 
 Features
 ========
 - A single file with optional dependencies to extend functionality.
-- No external dependencies except for the standard library and necessary platform libraries such as XLib and Win32.
-- Software rendering, with up to 256 colors.
-- Uncapped framerate
-- Custom resolutions
-- 8 bits of input
+- No external dependencies except for the standard library and necessary platform libraries
+  like XLib and Win32.
+- Software rendering, with up to 256 colors and a customizable palette.
+- Uncapped framerate.
+- Custom resolutions of any dimensions.
+- 8 buttons of input
   - Up, down, left, right
   - A, B
   - Start, Select
-- A simple API
-- Supports Windows and Linux
+- Sound groups with independant volume controls.
+- A simple API.
+- Supports Windows and Linux.
 
 
 Features Coming Soon
 ====================
+- Fullscreen mode
 - Line rasterization
 - Triangle rasterization (solid and textured)
 - Rotated sprites
 - More optimizations, especially for graphics
 - More platforms
+- More flexibility for input:
+  - Support for binding different keys to the same button.
+  - Support for general keyboard controls (in addition to buttons)
+  - Support for mouse controls
+  - Support for 360 controllers
 
 
 Usage
 =====
-Mintaro is a single-file library. To use it, just #include "mintaro.h" like you would any other header file and then
-in one source file do the following:
+Mintaro is a single-file library. To use it, just #include "mintaro.h" like you would any other
+header file and then in one source file do the following:
 
     #define MINTARO_IMPLEMENTATION
     #include "mintaro.h"
     
 Make sure you don't define the implementation in more than one translation unit.
 
-Mintaro includes a built-in loader for TGA images, but you can enable loading of additional formats via stb_image by
-simply including it before the implementation of Mintaro, like this:
+Mintaro includes a built-in loader for TGA images, but you can enable loading of additional
+formats via stb_image by simply including it before the implementation of Mintaro, like this:
 
     #define STB_IMAGE_IMPLEMENTATION
     #include "stb_image.h"
@@ -45,12 +60,16 @@ simply including it before the implementation of Mintaro, like this:
     
 A copy of stb_image.h is included in the "extras" directory.
 
+Mintaro includes a built-in loader for WAV sounds, but you can enable loading of Vorbis and FLAC
+sounds by #including stb_vorbis.c and/or dr_flac.h before the implementation of Mintaro, in the
+same was as mentioned above for stb_image.h.
+
 
 Examples
 ========
 Mintaro is focused on simplicity. Here's a quick example.
 
-```
+```c
 void on_step(mo_context* pContext, double dt)
 {
     // Input.
@@ -95,3 +114,5 @@ int main()
     return result;
 }
 ```
+
+You can also find a "Hello, World!" example in the "examples" folder.

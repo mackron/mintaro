@@ -3,6 +3,15 @@
 //
 // David Reid - mackron@gmail.com
 
+// ABOUT
+// =====
+// Mintaro is a small framework for building simple, retro style games. It is not a full featured game
+// engine so if that's what you're after you'll need to look elsewhere. The main intent for this library
+// is to just make it fun to build simple games without having to worry about annoying things like
+// complex build systems, long build times and complex APIs with steep learning curves.
+//
+//
+//
 // USAGE
 // =====
 // Mintaro is a single-file library. To use it, do something like the following in one .c file.
@@ -10,6 +19,22 @@
 //   #include "mintaro.h"
 //
 // You can then #include this file in other parts of the program as you would with any other header file.
+//
+// Mintaro has built-in support for TGA images and WAV audio, but can also make use of stb_image for
+// additional image formats and stb_vorbis and dr_flac for Vorbis and FLAC audio respectively. To enable
+// this, just #include them before the implementation of Mintaro:
+//
+//   #include "stb_image.h"
+//   #include "stb_vorbis.c
+//   #include "dr_flac.h"
+//
+//   ...
+//
+//   #define MINTARO_IMPLEMENTATION
+//   #include "mintaro.h"
+//   
+// You only need to #include these for the _implementation_ of Mintaro. You can find stb_image, stb_vorbis
+// and dr_flac in the "extras" folder.
 //
 //
 // Building (Windows)
@@ -22,8 +47,9 @@
 //
 // Building (Linux)
 // ----------------
-// The Linux build uses ALSA for it's backend so you will need to install the relevant ALSA development pacakges
-// for your preferred distro. It also uses X11 and pthreads, both of which should be easy to set up.
+// The Linux build uses ALSA for it's backend so you will need to install the relevant ALSA development
+// pacakges for your preferred distro. It also uses X11 and pthreads, both of which should be easy to
+// set up.
 //
 // Linking: -lX11 -lXext -lasound -lpthread -lm
 //
@@ -32,19 +58,22 @@
 // NOTES
 // =====
 // - This embeds mini_al for audio. See https://github.com/dr-soft/mini_al for more information.
-// - Mintaro is not currently thread-safe.
+// - Mintaro is not thread-safe.
 //
 // Graphics
 // --------
-// - The number of colors in the palette is configurable at initialization time, but has a maximum of 256 colors, with
-//   one color designated as transparency (there is only 1 level of transparency).
-// - The color index to use for transparency is configurable in case you want to plug in an existing palette.
+// - The number of colors in the palette is configurable at initialization time, but has a maximum of 256
+//   colors, with one color designated as transparency (there is only 1 level of transparency).
+// - The color index to use for transparency is configurable in case you want to plug in an existing
+//   palette.
 //
 // Audio
 // -----
-// - Optimal audio format: Stereo, 44100Hz, 16-bit signed integer PCM.
-// - 44100Hz is the only supported sample rate. Sounds will always be played at this rate regardless of the sample
-//   rate of the source file.
+// - Audio data is _always_ converted to 16-bit signed integer PCM, so consider using this for your audio
+//   assets. You will _not_ get quality improvements by using 24- or 32-bit formats, and you will _not_ be
+//   saving memory by using 8-bit formats.
+// - The sample rate for audio can be set at initialization time, but all sounds must use that same sample
+//   rate. Mintaro does not currently do any sample rate conversion, though this is planned for the future.
 
 #ifndef mintaro_h
 #define mintaro_h

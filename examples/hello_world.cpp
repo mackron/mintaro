@@ -1,3 +1,12 @@
+// To build this example:
+//
+// VC++: Just create an empty project and add this file. No need to link to anything.
+// GCC/Clang (Windows) g++ hello_world.cpp -lgdi32
+// GCC/Clang (Linux)   g++ hello_world.cpp -lX11 -lXext -lasound -lpthread -lm
+//
+// You shouldn't need to install anything other than the development packages for X11, pthreads, etc., but they
+// should all be ubiquitous and quite easy to install.
+
 #define MINTARO_IMPLEMENTATION
 #include "../mintaro.h"
 
