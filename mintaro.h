@@ -1234,8 +1234,6 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
     // it only marked for deletion is because Mintaro is not thread-safe and this function will be called on another
     // thread to the main stepping thread.
 
-    // TODO: Add support for FLAC and Vorbis.
-
     // Currently assuming the device is stereo. When/if different channel counts are supported we'll need to look
     // into making this more robust.
     mo_assert(pSound->pContext->playbackDevice2.channels == 2);
