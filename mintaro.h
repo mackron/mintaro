@@ -1968,6 +1968,17 @@ int mo_run(mo_context* pContext)
 			pContext->buttonPressState = 0;
 			pContext->buttonReleaseState = 0;
 		}
+
+        // Collect garbage.
+        if (pContext->isSoundMarkedForDeletion) {
+            for (size_t iSound = 0; iSound < pContext->soundCount; /* DO NOTHING */) {
+                if (pContext->ppSounds[iSound]->isMarkedForDeletion) {
+                    mo_sound_delete(pContext->ppSounds[iSound]);
+                } else {
+                    iSound += 1;
+                }
+            }
+        }
 		
 		// Present the screen to the window.
 		mo_present(pContext);
