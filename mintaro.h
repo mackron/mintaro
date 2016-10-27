@@ -1238,7 +1238,7 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
 
     // Currently assuming the device is stereo. When/if different channel counts are supported we'll need to look
     // into making this more robust.
-    mo_assert(pSound->pContext->playbackDevice2.channels == 2);
+    mo_assert(pSound->pContext->playbackDevice2.channels <= 2);
 
     mo_uint32 totalFramesRead = 0;
 
@@ -1255,37 +1255,52 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
                 framesAvailable = frameCount;
             }
 
-            if (soundChannels == 1) {
-                // Mono
+            if (deviceChannels == 1) {
+                // Mono. For converting to mono all we do is just average each channel.
                 for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                    float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame] * linearVolume;
-                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
-                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
-                }
-                pSound->raw.currentSample += framesAvailable * soundChannels;
-            } else if (soundChannels == 2) {
-                // Stereo
-                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                    float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 0] * linearVolume;
-                    float scaledSample1 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 1] * linearVolume;
-                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
-                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                    float totalPCM = 0;
+                    for (mo_uint32 iChannel = 0; iChannel < soundChannels; ++iChannel) {
+                        totalPCM += (float)pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame];
+                    }
+
+                    float outputSample = pFrames[iFrame] + ((totalPCM / soundChannels) * linearVolume);
+                    pFrames[iFrame] = (mo_int16)(mo_clampf(outputSample, -32768.0f, 32767.0f));
                 }
                 pSound->raw.currentSample += framesAvailable * soundChannels;
             } else {
-                // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
-                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                    for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
-                        float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + iChannel] * linearVolume;
-                        float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
-                        pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                // Stereo.
+                if (soundChannels == 1) {
+                    // Mono
+                    for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                        float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame] * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                        float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
+                        pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
                     }
+                    pSound->raw.currentSample += framesAvailable * soundChannels;
+                } else if (soundChannels == 2) {
+                    // Stereo
+                    for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                        float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 0] * linearVolume;
+                        float scaledSample1 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + 1] * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                        float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
+                        pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                    }
+                    pSound->raw.currentSample += framesAvailable * soundChannels;
+                } else {
+                    // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
+                    for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                        for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
+                            float scaledSample0 = pSound->pSource->raw.pSampleData[pSound->raw.currentSample + iFrame*soundChannels + iChannel] * linearVolume;
+                            float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
+                            pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        }
+                    }
+                    pSound->raw.currentSample += framesAvailable * soundChannels;
                 }
-                pSound->raw.currentSample += framesAvailable * soundChannels;
             }
 
 
@@ -1318,7 +1333,7 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
             mo_uint64 framesAvailable = frameCount;
 
             // We need to use an intermediary here. The process goes: stb_vorbis -> temp buffer -> sum with output.
-            mo_int16 tempFrames[4096];
+            float tempFrames[4096];
             mo_uint32 tempFrameCount = sizeof(tempFrames) / sizeof(tempFrames[0]) / soundChannels;
             if (framesAvailable > tempFrameCount) {
                 framesAvailable = tempFrameCount;
@@ -1327,14 +1342,14 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
             // This is used for later checking if we need to stop playback or loop back to the start.
             mo_bool32 reachedEnd = MO_FALSE;
             
-            int framesRead = stb_vorbis_get_samples_short_interleaved((stb_vorbis*)pSound->vorbis.pDecoder, (int)soundChannels, tempFrames, (int)(framesAvailable * soundChannels));
+            int framesRead = stb_vorbis_get_samples_float_interleaved((stb_vorbis*)pSound->vorbis.pDecoder, (int)deviceChannels, tempFrames, (int)(framesAvailable * deviceChannels));
             if (framesRead < (int)framesAvailable) {
                 reachedEnd = MO_TRUE;
             }
 
             // Unroll this loop for stereo? Probably not worth it...
             for (mo_uint32 iSample = 0; iSample < framesRead*soundChannels; ++iSample) {
-                float scaledSample0 = tempFrames[iSample] * linearVolume;
+                float scaledSample0 = tempFrames[iSample]*32767.0f * linearVolume;
                 float outputSample0 = pFrames[iSample] + scaledSample0;
                 pFrames[iSample] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
             }
@@ -1385,32 +1400,46 @@ mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVol
 
 
             // Channel conversion.
-            if (soundChannels == 1) {
-                // Mono
-                for (mo_uint32 iFrame = 0; iFrame < framesRead; ++iFrame) {
-                    float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
-                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
-                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
-                }
-            } else if (soundChannels == 2) {
-                // Stereo
+            if (deviceChannels == 1) {
+                // Mono. For converting to mono all we do is just average each channel.
                 for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                    float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
-                    float scaledSample1 = (tempFrames[iFrame*soundChannels + 1] >> 16) * linearVolume;
-                    float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
-                    float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
-                    pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
-                    pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                    float totalPCM = 0;
+                    for (mo_uint32 iChannel = 0; iChannel < soundChannels; ++iChannel) {
+                        totalPCM += (float)(tempFrames[iFrame*soundChannels + iChannel] >> 16);
+                    }
+
+                    float outputSample = pFrames[iFrame] + ((totalPCM / soundChannels) * linearVolume);
+                    pFrames[iFrame] = (mo_int16)(mo_clampf(outputSample, -32768.0f, 32767.0f));
                 }
             } else {
-                // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
-                for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
-                    for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
-                        float scaledSample0 = (tempFrames[iFrame*soundChannels + iChannel] >> 16) * linearVolume;
-                        float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
-                        pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                // Stereo.
+                if (soundChannels == 1) {
+                    // Mono
+                    for (mo_uint32 iFrame = 0; iFrame < framesRead; ++iFrame) {
+                        float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                        float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample0;
+                        pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                    }
+                } else if (soundChannels == 2) {
+                    // Stereo
+                    for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                        float scaledSample0 = (tempFrames[iFrame*soundChannels + 0] >> 16) * linearVolume;
+                        float scaledSample1 = (tempFrames[iFrame*soundChannels + 1] >> 16) * linearVolume;
+                        float outputSample0 = pFrames[iFrame*deviceChannels + 0] + scaledSample0;
+                        float outputSample1 = pFrames[iFrame*deviceChannels + 1] + scaledSample1;
+                        pFrames[iFrame*deviceChannels + 0] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        pFrames[iFrame*deviceChannels + 1] = (mo_int16)(mo_clampf(outputSample1, -32768.0f, 32767.0f));
+                    }
+                } else {
+                    // More than stereo. Just drop the extra channels. This can be used for stereo sounds, but is not as optimized.
+                    for (mo_uint32 iFrame = 0; iFrame < framesAvailable; ++iFrame) {
+                        for (mo_uint32 iChannel = 0; iChannel < deviceChannels; ++iChannel) {
+                            float scaledSample0 = (tempFrames[iFrame*soundChannels + iChannel] >> 16) * linearVolume;
+                            float outputSample0 = pFrames[iFrame*deviceChannels + iChannel] + scaledSample0;
+                            pFrames[iFrame*deviceChannels + iChannel] = (mo_int16)(mo_clampf(outputSample0, -32768.0f, 32767.0f));
+                        }
                     }
                 }
             }
@@ -1544,10 +1573,7 @@ mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowS
     if (pProfile->audioSampleRate == 0) pProfile->audioSampleRate = 44100;
     if (pProfile->audioChannels == 0) pProfile->audioChannels = 2;
 
-    // For now, only supporting a channel count of 2.
-    if (pProfile->audioChannels < 2) {
-        pProfile->audioChannels = 2;    // Remove this entire if statement when support for mono is added.
-    }
+    // For now, only supporting mono and stereo.
     if (pProfile->audioChannels > 2) {
         pProfile->audioChannels = 2;
     }
