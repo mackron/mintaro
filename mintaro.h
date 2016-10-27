@@ -1,5 +1,5 @@
 // Small retro game framework. Public domain. See "unlicense" statement at the end of this file.
-// mintaro - v0.1 - 2016-10-27
+// mintaro - v0.2 - TBD
 //
 // David Reid - mackron@gmail.com
 
@@ -20,11 +20,12 @@
 //
 // You can then #include this file in other parts of the program as you would with any other header file.
 //
-// Mintaro has built-in support for TGA images and WAV audio, but can also make use of stb_image for
-// additional image formats and stb_vorbis and dr_flac for Vorbis and FLAC audio respectively. To enable
-// this, just #include them before the implementation of Mintaro:
+// Mintaro has built-in support for TGA images and WAV audio, but can also make use of stb_image and
+// dr_pcx for additional image formats and stb_vorbis and dr_flac for Vorbis and FLAC audio respectively.
+// To enable this, just #include them before the implementation of Mintaro:
 //
 //   #include "stb_image.h"
+//   #include "dr_pcx.h"
 //   #include "stb_vorbis.c
 //   #include "dr_flac.h"
 //
@@ -100,6 +101,9 @@ extern "C" {
 // External library support.
 #ifdef STBI_INCLUDE_STB_IMAGE_H
 #define MO_HAS_STB_IMAGE
+#endif
+#ifdef dr_pcx_h
+#define MO_HAS_DR_PCX
 #endif
 #ifdef STB_VORBIS_INCLUDE_STB_VORBIS_H
 #define MO_HAS_STB_VORBIS
@@ -2807,7 +2811,29 @@ static void* mo_image_load__stb(const void* pFileData, size_t fileSize, unsigned
 
     int widthSTB;
     int heightSTB;
-    stbi_uc* pImageData = stbi_load_from_memory(pFileData, (int)fileSize, &widthSTB, &heightSTB, NULL, 4);
+    stbi_uc* pImageData = stbi_load_from_memory((const stbi_uc*)pFileData, (int)fileSize, &widthSTB, &heightSTB, NULL, 4);
+    if (pImageData == NULL) {
+        return NULL;
+    }
+
+    if (pWidthOut  != NULL) *pWidthOut  = (unsigned int)widthSTB;
+    if (pHeightOut != NULL) *pHeightOut = (unsigned int)heightSTB;
+    if (pFormat    != NULL) *pFormat    = mo_image_format_rgba8;
+    return (void*)pImageData;
+}
+#endif
+
+#ifdef MO_HAS_DR_PCX
+static void* mo_image_load__pcx(const void* pFileData, size_t fileSize, unsigned int* pWidthOut, unsigned int* pHeightOut, mo_image_format* pFormat)
+{
+    if (pWidthOut  != NULL) *pWidthOut  = 0;
+    if (pHeightOut != NULL) *pHeightOut = 0;
+    if (pFormat    != NULL) *pFormat    = mo_image_format_unknown;
+    if (pFileData  == NULL) return NULL;
+
+    int widthSTB;
+    int heightSTB;
+    dr_uint8* pImageData = drpcx_load_memory(pFileData, (int)fileSize, DR_FALSE, &widthSTB, &heightSTB, NULL, 4);
     if (pImageData == NULL) {
         return NULL;
     }
@@ -2840,6 +2866,9 @@ mo_result mo_image_load(mo_context* pContext, const char* filePath, mo_image** p
 #ifdef MO_HAS_STB_IMAGE
     void* pImageDataSTB = NULL;
 #endif
+#ifdef MO_HAS_DR_PCX
+    void* pImageDataPCX = NULL;
+#endif
 
     if (mo_extension_equal(filePath, "moimage")) {
         pImageData = mo_image_load__native(pFileData, fileSize, &width, &height, &format);
@@ -2858,18 +2887,30 @@ mo_result mo_image_load(mo_context* pContext, const char* filePath, mo_image** p
 
         pImageData = pImageDataTGA;
     } else {
+#ifdef MO_HAS_DR_PCX
+        if (pImageData == NULL && mo_extension_equal(filePath, "pcx")) {
+            pImageDataPCX = mo_image_load__pcx(pFileData, fileSize, &width, &height, &format);
+            if (pImageDataPCX != NULL) {
+                pImageData = pImageDataPCX;
+            }
+        }
+#endif
 #ifdef MO_HAS_STB_IMAGE
-        pImageDataSTB = mo_image_load__stb(pFileData, fileSize, &width, &height, &format);
-        if (pImageDataSTB == NULL) {
-            mo_logf(pContext, "Unsupported or corrupt image file (%s): %s", filePath, stbi__g_failure_reason);
-            mo_free(pFileData);
+        if (pImageData == NULL) {
+            pImageDataSTB = mo_image_load__stb(pFileData, fileSize, &width, &height, &format);
+            if (pImageDataSTB == NULL) {
+                mo_logf(pContext, "Unsupported or corrupt image file (%s): %s", filePath, stbi__g_failure_reason);
+                mo_free(pFileData);
+                return MO_INVALID_RESOURCE;
+            }
+
+            pImageData = pImageDataSTB;
+        }
+#endif
+
+        if (pImageData == NULL) {
             return MO_INVALID_RESOURCE;
         }
-
-        pImageData = pImageDataSTB;
-#else
-        return MO_INVALID_RESOURCE;
-#endif
     }
 
     mo_result result = mo_image_create(pContext, width, height, format, pImageData, ppImage);
@@ -2881,6 +2922,11 @@ mo_result mo_image_load(mo_context* pContext, const char* filePath, mo_image** p
 #ifdef MO_HAS_STB_IMAGE
     if (pImageDataSTB) {
         stbi_image_free(pImageDataSTB);
+    }
+#endif
+#ifdef MO_HAS_DR_PCX
+    if (pImageDataPCX) {
+        drpcx_free(pImageDataPCX);
     }
 #endif
 
@@ -7384,6 +7430,10 @@ mal_uint32 mal_get_sample_size_in_bytes(mal_format format)
 
 // REVISION HISTORY
 // ================
+//
+// v0.2 - TBD
+//   - Added support for loading PCX images via dr_pcx.
+//   - Fixed C++ build when building with stb_image enabled.
 //
 // v0.1 - 2016-10-27
 //   - Initial versioned release.
