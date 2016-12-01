@@ -9,9 +9,9 @@ C/C++, single file, public domain.
 
 Features
 ========
-- A single file with optional dependencies to extend functionality.
-- No external dependencies except for the standard library and necessary platform libraries
-  like XLib and Win32.
+- A single file with no external dependencies except for the standard library and necessary
+  platform libraries like XLib and Win32.
+  - Optionally depends on dr_flac, stb_vorbis, dr_pcx and stb_image to extend functionality.
 - Software rendering, with up to 256 colors and a customizable palette.
 - Uncapped framerate.
 - Custom resolutions of any dimensions.
