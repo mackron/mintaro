@@ -26,7 +26,7 @@ void example1_on_step(mo_context* pContext, double dt)
     int white = mo_find_closest_color(pContext, mo_make_rgb(255, 255, 255));
     int blue  = mo_find_closest_color(pContext, mo_make_rgb(128, 192, 255));
 
-	mo_clear(pContext, black);
+    mo_clear(pContext, black);
 
     switch (g_CurrentScreen)
     {
@@ -116,9 +116,9 @@ int main(int argc, char** argv)
     (void)argv;
 
     mo_context* pContext;
-	if (mo_init(NULL, 160*2, 144*2, "Hello, World!", example1_on_step, NULL, &pContext) != MO_SUCCESS) {
-		return -1;
-	}
+    if (mo_init(NULL, 160*2, 144*2, "Hello, World!", example1_on_step, NULL, &pContext) != MO_SUCCESS) {
+        return -1;
+    }
 
     int result = mo_run(pContext);
 
