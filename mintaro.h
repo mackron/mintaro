@@ -2545,7 +2545,7 @@ static void* mo_image_load__tga(const void* pFileData, size_t fileSize, unsigned
             }
         } break;
 
-        case 3:     // Uncompressed black and white. Not yet supported.
+        case 3:     // Uncompressed black and white.
         {
             size_t srcRowSizeInBytes = width*bytesPerPixel;
             if (fileSize < srcRowSizeInBytes*height) {
