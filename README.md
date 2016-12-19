@@ -62,7 +62,7 @@ A copy of stb_image.h is included in the "extras" directory.
 
 Mintaro includes a built-in loader for WAV sounds, but you can enable loading of Vorbis and FLAC
 sounds by #including stb_vorbis.c and/or dr_flac.h before the implementation of Mintaro, in the
-same was as mentioned above for stb_image.h.
+same way as mentioned above for stb_image.h.
 
 
 Examples
