@@ -6,7 +6,7 @@
 //
 // You shouldn't need to install anything other than the development packages for X11, pthreads, etc., but they
 // should all be ubiquitous and quite easy to install.
-
+#define MO_USE_EXTERNAL_MINIAUDIO
 #define MINTARO_IMPLEMENTATION
 #include "../mintaro.h"
 
