@@ -1009,7 +1009,8 @@ void mo_x11_present(mo_context* pContext)
 ///////////////////////////////////////////////////////////////////////////////
 void mo_on_log__mal(ma_context* pContext, ma_device* pDevice, ma_uint32 logLevel, const char* message)
 {
-    mo_logf((mo_context*)pDevice->pUserData, "[AUDIO][%s] %s", ma_log_level_to_string(logLevel), message);
+    (void)pDevice;
+    mo_logf((mo_context*)pContext->pUserData, "[AUDIO][%s] %s", ma_log_level_to_string(logLevel), message);
 }
 
 mo_uint32 mo_sound__read_and_accumulate_frames(mo_sound* pSound, float linearVolume, mo_uint32 frameCount, mo_int16* pFrames)
@@ -1298,6 +1299,7 @@ mo_result mo_init_audio(mo_context* pContext)
 
     ma_context_config contextConfig = ma_context_config_init();
     contextConfig.logCallback = mo_on_log__mal;
+    contextConfig.pUserData   = pContext;
 
     ma_device_config config = ma_device_config_init(ma_device_type_playback);
     config.playback.format   = ma_format_s16;
