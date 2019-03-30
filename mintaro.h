@@ -581,6 +581,19 @@ mo_bool32 mo_was_button_pressed(mo_context* pContext, unsigned int button);
 mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button);
 
 
+
+//// Text ////
+
+// Retrieves the height of a line of text.
+mo_uint32 mo_get_line_height(mo_context* pContext);
+
+// Retrieves the width of the given text.
+//
+// This assumes the text is on one line.
+mo_uint32 mo_get_text_width(mo_context* pContext, const char* line);
+
+
+
 //// Misc ////
 #define mo_degrees(radians) ((radians) * 57.29577951308232087685f)
 #define mo_radians(degrees) ((degrees) *  0.01745329251994329577f)
@@ -659,6 +672,13 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button);
 #define mo_assert(condition) assert(condition)
 #endif
 #endif
+
+#define mo_zero_object(p)          mo_zero_memory((p), sizeof(*(p)))
+#define mo_countof(x)              (sizeof(x) / sizeof(x[0]))
+#define mo_max(x, y)               (((x) > (y)) ? (x) : (y))
+#define mo_min(x, y)               (((x) < (y)) ? (x) : (y))
+#define mo_clamp(x, lo, hi)        (mo_max(lo, mo_min(x, hi)))
+#define mo_offset_ptr(p, offset)   (((mo_uint8*)(p)) + (offset))
 
 #ifdef MO_X11
 #include <stdlib.h>
@@ -3333,6 +3353,10 @@ mo_result mo_sound_source_create_vorbis(mo_context* pContext, size_t dataSize, c
 #ifdef MO_HAS_STB_VORBIS
     return mo_sound_source_create__generic_decoder(pContext, mo_sound_source_type_vorbis, dataSize, pData, ppSource);
 #else
+    (void)pContext;
+    (void)dataSize;
+    (void)pData;
+    (void)ppSource;
     return MO_UNSUPPORTED_AUDIO_FORMAT;
 #endif
 }
@@ -3342,6 +3366,10 @@ mo_result mo_sound_source_create_flac(mo_context* pContext, size_t dataSize, con
 #ifdef MO_HAS_STB_VORBIS
     return mo_sound_source_create__generic_decoder(pContext, mo_sound_source_type_flac, dataSize, pData, ppSource);
 #else
+    (void)pContext;
+    (void)dataSize;
+    (void)pData;
+    (void)ppSource;
     return MO_UNSUPPORTED_AUDIO_FORMAT;
 #endif
 }
@@ -4097,6 +4125,26 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button)
     }
 
     return (pContext->buttonReleaseState & button) != 0;
+}
+
+
+//// Test ////
+
+mo_uint32 mo_get_character_width(mo_context* pContext)
+{
+    (void)pContext;
+    return 9;
+}
+
+mo_uint32 mo_get_line_height(mo_context* pContext)
+{
+    (void)pContext;
+    return 9;
+}
+
+mo_uint32 mo_get_text_width(mo_context* pContext, const char* text)
+{
+    return strlen(text) * mo_get_character_width(pContext);
 }
 
 
