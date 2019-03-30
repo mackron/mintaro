@@ -118,7 +118,7 @@ extern "C" {
 //
 ///////////////////////////////////////////////////////////////////////////////
 #if defined(MO_USE_EXTERNAL_MINIAUDIO)
-#include "extras/mini_al/miniaudio.h"
+#include "extras/miniaudio/miniaudio.h"
 #else
 /* TODO: Embed miniaudio header section. */
 #error "miniaudio is not currently embedded in mintaro. Please use #define MO_USE_EXTERNAL_MINIAUDIO"
@@ -3955,7 +3955,7 @@ mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button)
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #define MINIAUDIO_IMPLEMENTATION
 #if defined(MO_USE_EXTERNAL_MINIAUDIO)
-#include "extras/mini_al/miniaudio.h"
+#include "extras/miniaudio/miniaudio.h"
 #else
 #error "miniaudio is not currently embedded in mintaro. Please use #define MO_USE_EXTERNAL_MINIAUDIO"
 #endif  //MO_USE_EXTERNAL_MINIAUDIO
