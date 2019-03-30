@@ -773,7 +773,10 @@ double mo_timer_tick(mo_timer* pTimer)
 
 static inline void mo__on_button_down(mo_context* pContext, unsigned int button)
 {
-    if (button == 0) return;
+    if (button == 0) {
+        return;
+    }
+
     if ((pContext->buttonState & button) == 0) {
         pContext->buttonState |= button;
         pContext->buttonPressState |= button;
@@ -783,7 +786,10 @@ static inline void mo__on_button_down(mo_context* pContext, unsigned int button)
 
 static inline void mo__on_button_up(mo_context* pContext, unsigned int button)
 {
-    if (button == 0) return;
+    if (button == 0) {
+        return;
+    }
+
     pContext->buttonState &= ~button;
     pContext->buttonPressState &= ~button;
     pContext->buttonReleaseState |= button;
@@ -904,7 +910,10 @@ static inline void* mo_get_x11_window_property(Display* display, Window window, 
 
 void mo_x11_create_presentation_buffer(mo_context* pContext, unsigned int sizeX, unsigned int sizeY)
 {
-    if (pContext == NULL || pContext->pPresentBufferX11 != NULL) return;
+    if (pContext == NULL || pContext->pPresentBufferX11 != NULL) {
+        return;
+    }
+
     if (sizeX == 0) sizeX = 1;
     if (sizeY == 0) sizeY = 1;
 
@@ -949,7 +958,9 @@ void mo_x11_create_presentation_buffer(mo_context* pContext, unsigned int sizeX,
 
 void mo_x11_delete_presentation_buffer(mo_context* pContext)
 {
-    if (pContext == NULL || pContext->pPresentBufferX11 == NULL) return;
+    if (pContext == NULL || pContext->pPresentBufferX11 == NULL) {
+        return;
+    }
 
     if (pContext->flags & MO_FLAG_X11_USING_SHM) {
         XShmDetach(g_moX11Display, &pContext->shmInfo);
@@ -965,14 +976,19 @@ void mo_x11_delete_presentation_buffer(mo_context* pContext)
 
 void mo_x11_resize_presentation_buffer(mo_context* pContext, unsigned int sizeX, unsigned int sizeY)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
+
     mo_x11_delete_presentation_buffer(pContext);
     mo_x11_create_presentation_buffer(pContext, sizeX, sizeY);
 }
 
 void mo_x11_present(mo_context* pContext)
 {
-    if (pContext == NULL || pContext->pPresentBufferX11 == NULL) return;
+    if (pContext == NULL || pContext->pPresentBufferX11 == NULL) {
+        return;
+    }
 
     if (pContext->flags & MO_FLAG_X11_USING_SHM) {
         XShmPutImage(g_moX11Display, pContext->windowX11, pContext->gcX11, pContext->pPresentBufferX11,
@@ -1326,7 +1342,10 @@ mo_color_rgba mo_make_rgb(mo_uint8 r, mo_uint8 g, mo_uint8 b)
 
 mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowSizeY, const char* title, mo_on_step_proc onStep, void* pUserData, mo_context** ppContext)
 {
-    if (ppContext == NULL) return MO_INVALID_ARGS;
+    if (ppContext == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppContext);
 
     mo_profile defaultProfile;
@@ -1512,7 +1531,9 @@ mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowS
 
 void mo_uninit(mo_context* pContext)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
     mo_uninit_audio(pContext);
 
@@ -1548,7 +1569,9 @@ void mo_uninit(mo_context* pContext)
 
 void mo_present(mo_context* pContext)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
 #ifdef MO_WIN32
     // Conveniently, we can get Win32 to do the scaling for us. This means we're able to do an efficient 1x1 copy ourselves and then
@@ -1619,7 +1642,9 @@ void mo_present(mo_context* pContext)
     // [DONE] MIT-SHM Extension: https://linux.die.net/man/3/xshmputimage
     //     RESULT: A good optimization. About 7 microseconds faster @ 160x144 and scales with higher resolutions.
 
-    if (pContext->pPresentBufferX11 == NULL) return;
+    if (pContext->pPresentBufferX11 == NULL) {
+        return;
+    }
 
     unsigned int dstSizeX = pContext->pPresentBufferX11->width;
     unsigned int dstSizeY = pContext->pPresentBufferX11->height;
@@ -1740,7 +1765,9 @@ void mo_handle_x11_event(XEvent* ex)
 
 int mo_run(mo_context* pContext)
 {
-    if (pContext == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     while ((pContext->flags & MO_FLAG_CLOSING) == 0) {
         // Handle window events first.
@@ -1801,7 +1828,9 @@ int mo_run(mo_context* pContext)
 
 void mo_close(mo_context* pContext)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
 #ifdef MO_WIN32
     PostQuitMessage(0);
@@ -1812,7 +1841,10 @@ void mo_close(mo_context* pContext)
 
 void mo_log(mo_context* pContext, const char* message)
 {
-    if (pContext == NULL || pContext->onLog == NULL) return;
+    if (pContext == NULL || pContext->onLog == NULL) {
+        return;
+    }
+
     pContext->onLog(pContext, message);
 }
 
@@ -1921,7 +1953,9 @@ static mo_bool32 mo_extension_equal(const char* path, const char* extension)
 
 static void* mo_open_and_read_file_with_extra_data(mo_context* pContext, const char* filePath, size_t* pFileSizeOut, size_t extraBytes)
 {
-    if (pFileSizeOut) *pFileSizeOut = 0;   // For safety.
+    if (pFileSizeOut) {
+        *pFileSizeOut = 0;   // For safety.
+    }
 
     if (filePath == NULL) {
         return NULL;
@@ -2011,10 +2045,15 @@ static void* mo_open_and_read_file(mo_context* pContext, const char* filePath, s
 
 mo_result mo_image_create(mo_context* pContext, unsigned int width, unsigned int height, mo_image_format format, const void* pData, mo_image** ppImage)
 {
-    if (ppImage == NULL) return MO_INVALID_ARGS;
+    if (ppImage == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppImage);
 
-    if (pContext == NULL || width == 0 || height == 0 || pData == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL || width == 0 || height == 0 || pData == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     // Allocate the image first so we have an output buffer.
     size_t dataSize = width * height;
@@ -2079,7 +2118,10 @@ static const void* mo_image_load__native(const void* pFileData, size_t fileSize,
     if (pWidthOut  != NULL) *pWidthOut  = 0;
     if (pHeightOut != NULL) *pHeightOut = 0;
     if (pFormat    != NULL) *pFormat    = mo_image_format_unknown;
-    if (pFileData == NULL || fileSize < 12) return NULL;
+
+    if (pFileData == NULL || fileSize < 12) {
+        return NULL;
+    }
 
     const mo_uint8* pFileData8 = (const mo_uint8*)pFileData;
 
@@ -2105,7 +2147,10 @@ static void* mo_image_load__tga(const void* pFileData, size_t fileSize, unsigned
     if (pWidthOut  != NULL) *pWidthOut  = 0;
     if (pHeightOut != NULL) *pHeightOut = 0;
     if (pFormat    != NULL) *pFormat    = mo_image_format_unknown;
-    if (pFileData == NULL || fileSize < 18) return NULL;
+
+    if (pFileData == NULL || fileSize < 18) {
+        return NULL;
+    }
 
     const mo_uint8* pFileData8 = (const mo_uint8*)pFileData;
 
@@ -2545,7 +2590,10 @@ static void* mo_image_load__stb(const void* pFileData, size_t fileSize, unsigned
     if (pWidthOut  != NULL) *pWidthOut  = 0;
     if (pHeightOut != NULL) *pHeightOut = 0;
     if (pFormat    != NULL) *pFormat    = mo_image_format_unknown;
-    if (pFileData  == NULL) return NULL;
+
+    if (pFileData  == NULL) {
+        return NULL;
+    }
 
     int widthSTB;
     int heightSTB;
@@ -2567,7 +2615,10 @@ static void* mo_image_load__pcx(const void* pFileData, size_t fileSize, unsigned
     if (pWidthOut  != NULL) *pWidthOut  = 0;
     if (pHeightOut != NULL) *pHeightOut = 0;
     if (pFormat    != NULL) *pFormat    = mo_image_format_unknown;
-    if (pFileData  == NULL) return NULL;
+
+    if (pFileData  == NULL) {
+        return NULL;
+    }
 
     int widthSTB;
     int heightSTB;
@@ -2585,10 +2636,15 @@ static void* mo_image_load__pcx(const void* pFileData, size_t fileSize, unsigned
 
 mo_result mo_image_load(mo_context* pContext, const char* filePath, mo_image** ppImage)
 {
-    if (ppImage == NULL) return MO_INVALID_ARGS;
+    if (ppImage == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppImage);
 
-    if (pContext == NULL || filePath == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL || filePath == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     size_t fileSize;
     void* pFileData = mo_open_and_read_file(pContext, filePath, &fileSize);
@@ -2674,7 +2730,10 @@ mo_result mo_image_load(mo_context* pContext, const char* filePath, mo_image** p
 
 void mo_image_delete(mo_context* pContext, mo_image* pImage)
 {
-    if (pContext == NULL || pImage == NULL) return;
+    if (pContext == NULL || pImage == NULL) {
+        return;
+    }
+
     mo_free(pImage);
 }
 
@@ -2692,7 +2751,9 @@ static float mo_color_distance2(mo_color_rgba c1, mo_color_rgba c2)
 
 mo_color_index mo_find_closest_color(mo_context* pContext, mo_color_rgba color)
 {
-    if (pContext == NULL) return 0;
+    if (pContext == NULL) {
+        return 0;
+    }
 
     // We just do a simple distance test.
     float minDistance = 3.402823e+38f;  // FLT_MAX
@@ -2725,7 +2786,9 @@ mo_color_index mo_find_closest_color(mo_context* pContext, mo_color_rgba color)
 
 void mo_clear(mo_context* pContext, mo_color_index colorIndex)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
     for (unsigned int y = 0; y < pContext->profile.resolutionY; ++y) {
         for (unsigned int x = 0; x < pContext->profile.resolutionX; ++x) {
@@ -2736,7 +2799,9 @@ void mo_clear(mo_context* pContext, mo_color_index colorIndex)
 
 void mo_draw_quad(mo_context* pContext, int posX, int posY, int sizeX, int sizeY, mo_color_index colorIndex)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
     int left   = posX;
     int top    = posY;
@@ -3018,7 +3083,9 @@ static mo_uint8 pFontData[] = {
 static void mo_draw_glyph(mo_context* pContext, int posX, int posY, char c, mo_color_index colorIndex)
 {
     c -= 16;
-    if (c < 0 || c > 111) c = 0;
+    if (c < 0 || c > 111) {
+        c = 0;
+    }
 
     const unsigned int glyphSizeX = 9;
     const unsigned int glyphSizeY = 9;
@@ -3065,7 +3132,9 @@ static void mo_draw_glyph(mo_context* pContext, int posX, int posY, char c, mo_c
 
 void mo_draw_text(mo_context* pContext, int posX, int posY, mo_color_index colorIndex, const char* text)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
     int penPosX = posX;
     int penPosY = posY;
@@ -3115,13 +3184,18 @@ void mo_draw_textf(mo_context* pContext, int posX, int posY, mo_color_index colo
 
 void mo_draw_image(mo_context* pContext, int dstX, int dstY, mo_image* pImage, int srcX, int srcY, int srcWidth, int srcHeight)
 {
-    if (pImage == NULL) return;
+    if (pImage == NULL) {
+        return;
+    }
     mo_draw_image_scaled(pContext, dstX, dstY, pImage->width, pImage->height, pImage, srcX, srcY, srcWidth, srcHeight);
 }
 
 void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth, int dstHeight, mo_image* pImage, int srcX, int srcY, int srcWidth, int srcHeight/*, float rotation*/)
 {
-    if (pContext == NULL || pImage == NULL) return;
+    if (pContext == NULL || pImage == NULL) {
+        return;
+    }
+
     //mo_draw_quad(pContext, x, y, pImage->width, pImage->height, 3);   // Debugging
 
     //mo_assert(rotation == 0);   // Rotation isn't supported yet.
@@ -3159,8 +3233,13 @@ void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth
     float scaleY = (float)srcHeight / dstHeight;
 
     // Is the quad entirely out of bounds?
-    if (dstX+dstWidth < 0 || dstY+dstHeight < 0) return;
-    if (dstX >= (int)pContext->profile.resolutionX || dstY >= (int)pContext->profile.resolutionY) return;
+    if (dstX+dstWidth < 0 || dstY+dstHeight < 0) {
+        return;
+    }
+
+    if (dstX >= (int)pContext->profile.resolutionX || dstY >= (int)pContext->profile.resolutionY) {
+        return;
+    }
 
     // Clamp.
     float srcXOffset = 0;
@@ -3224,10 +3303,15 @@ void mo_draw_image_scaled(mo_context* pContext, int dstX, int dstY, int dstWidth
 
 mo_result mo_sound_source_create__generic_decoder(mo_context* pContext, mo_sound_source_type type, size_t dataSize, const void* pData, mo_sound_source** ppSource)
 {
-    if (ppSource == NULL) return MO_INVALID_ARGS;
+    if (ppSource == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppSource);
 
-    if (pContext == NULL || dataSize == 0 || pData == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL || dataSize == 0 || pData == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     mo_sound_source* pSource = (mo_sound_source*)mo_calloc(sizeof(*pSource) + dataSize);
     if (pSource == NULL) {
@@ -3262,11 +3346,19 @@ mo_result mo_sound_source_create_flac(mo_context* pContext, size_t dataSize, con
 
 mo_result mo_sound_source_create(mo_context* pContext, unsigned int channels, unsigned int sampleRate, mo_uint64 sampleCount, const mo_int16* pSampleData, mo_sound_source** ppSource)
 {
-    if (ppSource == NULL) return MO_INVALID_ARGS;
+    if (ppSource == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppSource);
 
-    if (pContext == NULL || channels == 0 || sampleRate == 0 || sampleCount == 0) return MO_INVALID_ARGS;
-    if (sampleCount > SIZE_MAX/sizeof(mo_int16)) return MO_INVALID_ARGS; // Sound is too big.
+    if (pContext == NULL || channels == 0 || sampleRate == 0 || sampleCount == 0) {
+        return MO_INVALID_ARGS;
+    }
+
+    if (sampleCount > SIZE_MAX/sizeof(mo_int16)) {
+        return MO_INVALID_ARGS; // Sound is too big.
+    }
 
     size_t sampleDataSize = (size_t)(sampleCount * sizeof(mo_int16));
 
@@ -3642,10 +3734,15 @@ static mo_bool32 mo_is_flac_stream(size_t dataSize, const void* pData)
 
 mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_sound_source** ppSource)
 {
-    if (ppSource == NULL) return MO_INVALID_ARGS;
+    if (ppSource == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppSource);
 
-    if (pContext == NULL || filePath == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL || filePath == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     size_t fileSize;
     void* pFileData = mo_open_and_read_file(pContext, filePath, &fileSize);
@@ -3697,13 +3794,18 @@ mo_result mo_sound_source_load(mo_context* pContext, const char* filePath, mo_so
 
 void mo_sound_source_delete(mo_sound_source* pSource)
 {
-    if (pSource == NULL) return;
+    if (pSource == NULL) {
+        return;
+    }
+
     mo_free(pSource);
 }
 
 mo_result mo_play_sound_source(mo_context* pContext, mo_sound_source* pSource, mo_uint32 group)
 {
-    if (pContext == NULL || pSource == NULL) return MO_INVALID_ARGS;
+    if (pContext == NULL || pSource == NULL) {
+        return MO_INVALID_ARGS;
+    }
 
     mo_sound* pSound;
     mo_result result = mo_sound_create(pContext, pSource, group, &pSound);
@@ -3720,36 +3822,56 @@ mo_result mo_play_sound_source(mo_context* pContext, mo_sound_source* pSource, m
 
 void mo_sound_group_pause(mo_context* pContext, mo_uint32 group)
 {
-    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) return;
+    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) {
+        return;
+    }
+
     pContext->soundGroups[group].flags |= MO_SOUND_GROUP_FLAG_PAUSED;
 }
 
 void mo_sound_group_resume(mo_context* pContext, mo_uint32 group)
 {
-    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) return;
+    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) {
+        return;
+    }
+
     pContext->soundGroups[group].flags &= ~MO_SOUND_GROUP_FLAG_PAUSED;
 }
 
 mo_bool32 mo_sound_group_is_paused(mo_context* pContext, mo_uint32 group)
 {
-    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) return MO_FALSE;
+    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) {
+        return MO_FALSE;
+    }
+
     return (pContext->soundGroups[group].flags & MO_SOUND_GROUP_FLAG_PAUSED) != 0;
 }
 
 void mo_sound_group_set_volume(mo_context* pContext, mo_uint32 group, float linearVolume)
 {
-    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) return;
-    if (linearVolume < 0) linearVolume = 0;
+    if (pContext == NULL || group < MO_SOUND_GROUP_COUNT) {
+        return;
+    }
+
+    if (linearVolume < 0) {
+        linearVolume = 0;
+    }
+
     pContext->soundGroups[group].linearVolume = linearVolume;
 }
 
 
 mo_result mo_sound_create(mo_context* pContext, mo_sound_source* pSource, mo_uint32 group, mo_sound** ppSound)
 {
-    if (ppSound == NULL) return MO_INVALID_ARGS;
+    if (ppSound == NULL) {
+        return MO_INVALID_ARGS;
+    }
+
     mo_zero_object(ppSound);
 
-    if (pContext == NULL || pSource == NULL || group >= MO_SOUND_GROUP_COUNT) return MO_INVALID_ARGS;
+    if (pContext == NULL || pSource == NULL || group >= MO_SOUND_GROUP_COUNT) {
+        return MO_INVALID_ARGS;
+    }
 
     mo_sound* pSound = (mo_sound*)mo_calloc(sizeof(*pSound));
     if (pSound == NULL) {
@@ -3814,7 +3936,9 @@ mo_result mo_sound_create(mo_context* pContext, mo_sound_source* pSource, mo_uin
 
 void mo_sound_delete(mo_sound* pSound)
 {
-    if (pSound == NULL) return;
+    if (pSound == NULL) {
+        return;
+    }
 
     mo_context* pContext = pSound->pContext;
     mo_assert(pContext != NULL);
@@ -3835,7 +3959,9 @@ void mo_sound_delete(mo_sound* pSound)
 
 void mo_sound_mark_for_deletion(mo_sound* pSound)
 {
-    if (pSound == NULL || pSound->isMarkedForDeletion) return;
+    if (pSound == NULL || pSound->isMarkedForDeletion) {
+        return;
+    }
 
     mo_context* pContext = pSound->pContext;
     mo_assert(pContext != NULL);
@@ -3848,14 +3974,22 @@ void mo_sound_mark_for_deletion(mo_sound* pSound)
 
 void mo_sound_set_volume(mo_sound* pSound, float linearVolume)
 {
-    if (pSound == NULL) return;
-    if (linearVolume < 0) linearVolume = 0;
+    if (pSound == NULL) {
+        return;
+    }
+
+    if (linearVolume < 0) {
+        linearVolume = 0;
+    }
+
     pSound->linearVolume = linearVolume;
 }
 
 void mo_sound_play(mo_sound* pSound, mo_bool32 loop)
 {
-    if (pSound == NULL) return;
+    if (pSound == NULL) {
+        return;
+    }
 
     if (loop) {
         pSound->flags |= MO_SOUND_FLAG_LOOPING;
@@ -3868,19 +4002,28 @@ void mo_sound_play(mo_sound* pSound, mo_bool32 loop)
 
 void mo_sound_stop(mo_sound* pSound)
 {
-    if (pSound == NULL) return;
+    if (pSound == NULL) {
+        return;
+    }
+
     pSound->flags &= ~MO_SOUND_FLAG_PLAYING;
 }
 
 mo_bool32 mo_sound_is_playing(mo_sound* pSound)
 {
-    if (pSound == NULL) return MO_FALSE;
+    if (pSound == NULL) {
+        return MO_FALSE;
+    }
+
     return (pSound->flags & MO_SOUND_FLAG_PLAYING) != 0;
 }
 
 mo_bool32 mo_sound_is_looping(mo_sound* pSound)
 {
-    if (pSound == NULL) return MO_FALSE;
+    if (pSound == NULL) {
+        return MO_FALSE;
+    }
+
     return (pSound->flags & MO_SOUND_FLAG_LOOPING) != 0;
 }
 
@@ -3900,7 +4043,9 @@ static int mo_get_button_index(mo_button button)
 
 void mo_bind_key_to_button(mo_context* pContext, mo_key key, mo_button button)
 {
-    if (pContext == NULL) return;
+    if (pContext == NULL) {
+        return;
+    }
 
     int index = mo_get_button_index(button);
     if (index == -1 || index >= MO_BUTTON_COUNT) {
@@ -3912,7 +4057,9 @@ void mo_bind_key_to_button(mo_context* pContext, mo_key key, mo_button button)
 
 mo_button mo_get_key_binding(mo_context* pContext, mo_key key)
 {
-    if (pContext == NULL) return 0;
+    if (pContext == NULL) {
+        return 0;
+    }
 
     for (int i = 0; i < MO_BUTTON_COUNT; ++i) {
         if (pContext->keymap[i] == key) {
@@ -3925,19 +4072,28 @@ mo_button mo_get_key_binding(mo_context* pContext, mo_key key)
 
 mo_bool32 mo_is_button_down(mo_context* pContext, unsigned int button)
 {
-    if (pContext == NULL) return MO_FALSE;
+    if (pContext == NULL) {
+        return MO_FALSE;
+    }
+
     return (pContext->buttonState & button) != 0;
 }
 
 mo_bool32 mo_was_button_pressed(mo_context* pContext, unsigned int button)
 {
-    if (pContext == NULL) return MO_FALSE;
+    if (pContext == NULL) {
+        return MO_FALSE;
+    }
+
     return (pContext->buttonPressState & button) != 0;
 }
 
 mo_bool32 mo_was_button_released(mo_context* pContext, unsigned int button)
 {
-    if (pContext == NULL) return MO_FALSE;
+    if (pContext == NULL) {
+        return MO_FALSE;
+    }
+
     return (pContext->buttonReleaseState & button) != 0;
 }
 
