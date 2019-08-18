@@ -1371,8 +1371,8 @@ mo_result mo_init(mo_profile* pProfile, mo_uint32 windowSizeX, mo_uint32 windowS
     mo_zero_object(ppContext);
 
     mo_profile defaultProfile;
-    defaultProfile.resolutionX = 160;
-    defaultProfile.resolutionY = 144;
+    defaultProfile.resolutionX = windowSizeX;
+    defaultProfile.resolutionY = windowSizeY;
     defaultProfile.transparentColorIndex = 255;
     defaultProfile.paletteSize = 256;
     mo_copy_memory(defaultProfile.palette, g_moDefaultPalette, 256*4);
